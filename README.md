@@ -1,12 +1,33 @@
 # 1. 数据库表结构
 
 1. bilibili.dynamic表项
-
-   ![image-20210812220753186](.\README.assets\image-20210812220753186.png)
-
+```
+CREATE TABLE `dynamic` (
+  `dynamic_id` char(30) NOT NULL,
+  `owner_id` char(20) NOT NULL,
+  `timestamp` char(30) DEFAULT NULL,
+  `up_num` int DEFAULT NULL,
+  `content` varchar(1024) DEFAULT NULL,
+  `dynamic_type` int DEFAULT NULL,
+  `rid` char(30) DEFAULT NULL,
+  `is_search` int(1) unsigned zerofill DEFAULT '0',
+  PRIMARY KEY (`dynamic_id`,`owner_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
 2. bilibili.user_comment表项
+```
+CREATE TABLE `user_comment` (
+  `user_id` char(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `reply_id` char(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `dynamic_id` char(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `up_num` int DEFAULT NULL,
+  `comments_num` int DEFAULT NULL,
+  `content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `time` char(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  PRIMARY KEY (`user_id`,`reply_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
 
-![image-20210812220832655](.\README.assets\image-20210812220832655.png)
 
 # 2. 如何运行
 
