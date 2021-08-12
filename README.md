@@ -70,7 +70,9 @@ CREATE TABLE `user_comment` (
    
    ```
 
-   
+3. 修改credential_listen: https://www.moyu.moe/bilibili-api/#/get-credential
+
+4. 修改数据库连接，目前我的数据库中只存取了大约8w+的评论。
 
 # 3. 注意事项
 
@@ -80,3 +82,4 @@ CREATE TABLE `user_comment` (
 # 4. TODO
 
 1. 动态添加latest_comment_timestamp字段，避免重复爬取，同时可以更新早期动态的新鲜评论
+2. 通过count调节不同时间的动态，改变其评论区遍历频率（新动态高频访问）
