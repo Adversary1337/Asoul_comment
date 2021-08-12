@@ -286,8 +286,8 @@ async def main():
     '''
     #await get_user_all_dynamics(listen_user_list, True)
     #if(count % 300 == 0):
-        #await get_user_all_dynamics(listen_user_list, False)
-    await get_dynamic_comments(True)
+    await get_user_all_dynamics(listen_user_list, True) #爬取指定用户动态相关信息
+    await get_dynamic_comments(True) #获取动态评论
     
 
 if __name__ == '__main__':
