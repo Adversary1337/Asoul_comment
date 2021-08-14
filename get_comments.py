@@ -20,7 +20,7 @@ handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-db = pymysql.connect(host = '101.34.122.xx', port = 3306, user = "root", passwd = "xx", charset = 'utf8mb4')
+db = pymysql.connect(host = 'xx', port = 3306, user = "root", passwd = "xx", charset = 'utf8mb4')
 cursor = db.cursor()
 
 timesleep = 5 #爬完一页的休息时间，过快容易被ban，实验发现3s也可
@@ -37,7 +37,7 @@ def execute_sql(order):
         logger.error(str(order))
         db.rollback()
 
-def comment_sql_order_makeup(is_flush, sql_order, count, user_id, reply_id, dynamic_id, up_num, comments_num, content, timestamp): #每x轮凑成一个语句提交至数据库
+def comment_sql_order_makeup(is_flush, sql_order, count, user_id, reply_id, dynamic_id, up_num, comments_num, content, timestamp):
     global logger
     if(count >= 6 or is_flush):
         sql_head = """
@@ -105,7 +105,7 @@ async def check_is_rid(DV, rid):
         except Exception as e:
             exception_str = str(e)
             if('404' in exception_str):
-                time.sleep(random.randint(0, timesleep))
+                time.sleep(random.randint(timesleep-1, timesleep))
                 if( FORM_CHOICE == len(type_list) - 1 ):
                     break
                 else:
@@ -114,6 +114,10 @@ async def check_is_rid(DV, rid):
             elif('412' in exception_str):
                 solve_412()
             else:
+                if("discon" in str(e)):
+                    logger.error("server disconneted, wait 10s")
+                    time.sleep(2*timesleep)
+                    continue
                 logger.error("return code not 404----" + str(e))
                 return False, -1
         return False, type_list[FORM_CHOICE]
@@ -125,7 +129,7 @@ async def check_is_rid(DV, rid):
         except Exception as e:
             exception_str = str(e)
             if('404' in exception_str):
-                time.sleep(random.randint(0, timesleep))
+                time.sleep(random.randint(timesleep-1, timesleep))
                 if(FORM_CHOICE==len(type_list)-1):
                     break
                 else:
@@ -134,6 +138,10 @@ async def check_is_rid(DV, rid):
             elif('412' in exception_str):
                 time.sleep(60 + random.randint(10,20))
             else:
+                if("discon" in str(e)):
+                    logger.error("server disconneted, wait 10s")
+                    time.sleep(2*timesleep)
+                    continue
                 logger.error("return code not 404----" + str(e))
                 return False, -1
         return True, type_list[FORM_CHOICE]
@@ -201,8 +209,53 @@ async def get_user_all_dynamics(listen_user_list, is_init):
 def solve_412():  #解决接口访问速度过快，被cr拒绝的问题，我没有其他的ip可用，所以选择睡眠半小时。不知道可不可行
     global logger
     logger.warning("412 to sleep")
-    time.sleep(60*60*0.5)
-    
+    time.sleep(60*60*0.1)
+
+async def get_single_dynamic(DV=555332476735236787):
+    sql_order = "SELECT * from bilibili.dynamic where dynamic_id = " + str(DV) + ";"
+    t = select_sql(sql_order)
+    dynamic_id, owner_id, timestamp, up_num, content, type, rid, is_search = t[0]
+    if(type < 0):
+        dynamic_id = rid
+        type = -type
+        is_rid = True
+    elif(type > 0):
+        dynamic_id = dynamic_id
+    else:
+        logger.error("dynamic type = 0")
+    i = 1
+    page_max = 1
+    try:
+        time.sleep(random.randint(25,30)/10 * timesleep)
+        comments = await comment.get_comments(oid=int(dynamic_id), type_=type, page_index=i, credential=credential_listen)
+        page_max = math.ceil(int(comments['page']['count'])/int(comments['page']['size']))
+        logger.info("dynamic:" + dynamic_id + ", page_max = " + str(page_max))
+    except Exception as e:
+        logger.error("get page max failed: " + str(e))
+        if("412" in str(e)):
+            solve_412()
+    while(i <= 10):
+        sql_order = ""
+        count = 0
+        try:
+            comments = await comment.get_comments(oid=int(dynamic_id), type_=type, page_index=i, credential=credential_listen)
+            if(comments['replies']!=None):
+                for t in comments['replies']:
+                    sql_order, count = comment_sql_order_makeup(False, sql_order, count, t['mid'], t['rpid'], dynamic_id, t['like'], 0, t['content']['message'], t['ctime'])
+            else:
+                break
+        except Exception as e:
+            if('412' in str(e)):
+                solve_412()
+        if(count != 0):
+            try:
+                sql_order, count = comment_sql_order_makeup(is_flush=True, sql_order=sql_order, count=0, user_id=0, reply_id=0, dynamic_id=0, up_num=0, comments_num=0, content=0, timestamp=0)
+            except Exception as e:
+                logger.error(str(e))
+        i += 1
+    time.sleep(random.randint(25,30)/50 * timesleep)
+    await remark_dynamic(dynamic_id, is_rid) #标记动态评论已爬完
+
 async def get_dynamic_comments(is_init):
     global logger
     timespace = 3
@@ -230,12 +283,12 @@ async def get_dynamic_comments(is_init):
         i = 1
         page_max = 1
         try:
+            time.sleep(random.randint(25,30) / 5 * timesleep)
             comments = await comment.get_comments(oid=int(dynamic_id), type_=type, page_index=i, credential=credential_listen)
-            time.sleep(timesleep)
             page_max = math.ceil(int(comments['page']['count'])/int(comments['page']['size']))
             logger.info("dynamic:" + dynamic_id + ", page_max = " + str(page_max))
         except Exception as e:
-            logger.error("get page max failed" + str(e))
+            logger.error("get page max failed: " + str(e))
             if("412" in str(e)):
                 solve_412()
             continue
@@ -258,12 +311,15 @@ async def get_dynamic_comments(is_init):
                 except Exception as e:
                     logger.error(str(e))
             i += 1
-        time.sleep(random.randint(25,30)/10 * timesleep)
+            time.sleep(random.randint(25,30) / 50 * timesleep)
         await remark_dynamic(dynamic_id, is_rid) #标记动态评论已爬完
 
 def select_sql(sql_order):
     global db
     global logger
+    if(sql_order == ""):
+        logger.warning("sql order empty")
+        return
     try:
         cursor.execute(sql_order)
         logger.info("execute_sql success:" + str(sql_order))
@@ -286,9 +342,9 @@ async def main():
     '''
     #await get_user_all_dynamics(listen_user_list, True)
     #if(count % 300 == 0):
-    await get_user_all_dynamics(listen_user_list, True) #爬取指定用户动态相关信息
-    await get_dynamic_comments(True) #获取动态评论
-    
+    #await get_user_all_dynamics(listen_user_list, False)
+    await get_dynamic_comments(True)
+    #await get_single_dynamic()
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())
